@@ -4,8 +4,8 @@
 #include <avr/interrupt.h>
 #include <stdio.h>  // For sprintf
 
-#define Relay_PIN PB0   // Define LED1 pin (B0)
-#define Relay_PIN2 PB1  // Define LED2 pin (B1)
+#define Relay_PIN PB0   // Define LED1 pin (B0) relay
+#define Relay_PIN2 PB1  // Define LED2 pin (B1) fan
 
 // LCD pin definitions based on your connections
 #define LCD_RS PD0 // RS pin connected to PD0
@@ -25,25 +25,46 @@ uint8_t dec_button_hold_count = 0;
 uint8_t mode_button_hold_count = 0;
 uint8_t mode = 0;
 
+// Variables to track button states
+uint8_t button_mode_prev_state = 0;
+uint8_t button_inc_prev_state = 0;
+uint8_t button_dec_prev_state = 0;
+
 uint8_t RH_I, RH_D, temp_I, temp_D, checksum, dataByte = 0;
 uint16_t light_value, temp_sensor_value;
 double temp;
 int inttemp;
 double pokabl;
 
-int humidity=11;
+
 int value = 20;  // Variable to store the incremented/decremented value
 int ledtimer=0;
 double timer =0;
 int cnt=3;
-int cnt1 = 0;
 int cnt2 = 0;
 int cnttimer1=0;
 
-// Variables to track button states
-uint8_t button_mode_prev_state = 0;
-uint8_t button_inc_prev_state = 0;
-uint8_t button_dec_prev_state = 0;
+
+
+
+void pin_init()
+{
+	// Set LED pin as output
+	DDRB |= (1 << Relay_PIN);
+	DDRB |= (1 << Relay_PIN2);
+	
+	// Set button pins as inputs with pull-up resistors
+	
+	DDRB &= ~(1 << BUTTON_DEC);  // Set PD7 as inputs
+	PORTB |= (1 << BUTTON_DEC);    // Enable pull-up resistors on PD7
+	
+	DDRD &= ~(1 << BUTTON_INC);  // Set PB6 as input
+	PORTD |= (1 << BUTTON_INC);   // Enable pull-up resistor
+	
+	// Set mode button as input with pull-up resistor
+	DDRC &= ~(1 << BUTTON_MODE);
+	PORTC |= (1 << BUTTON_MODE);  // Enable pull-up resistor on PC0
+}
 
 //brightness of lcd
 void init_timer0() {
@@ -238,20 +259,18 @@ void timer_display(double timer)
 	 int total_hours = (int)timer / 60;            // Calculate total hours
 	 double remaining_minutes = fmod(timer, 60);   // Use fmod to get the remainder (minutes)
 
-	if (timer == 0)
+	if (timer > 0)
 	{
-		lcd_puts("OFF  ");
-		cnt1 = 0;
-	}
-	else if (timer > 0)
-	{
-		if (cnt1 == 0)
+		lcd_puts("     ");
+			
+		if (total_hours >= 10)
 		{
-			lcd_puts("     ");
-			cnt1++;
+			lcd_put_number(total_hours);  // Display integer part
+			lcd_goto_xy(13, 1);  // Move cursor to print the value
+			lcd_puts("h  ");
 		}
 
-		if (total_hours < 10)
+		else
 		{
 			// Display the formatted value
 			lcd_put_number(total_hours);  // Display integer part
@@ -262,14 +281,10 @@ void timer_display(double timer)
 			lcd_goto_xy(15, 1);  // Move cursor to print the value
 			lcd_puts("m");
 		}
-		
-		if (total_hours >= 10)
-		{
-			lcd_put_number(total_hours);  // Display integer part
-			lcd_goto_xy(13, 1);  // Move cursor to print the value
-			lcd_puts("h  ");
-		}
-		
+	}
+	else
+	{
+		lcd_puts("OFF  ");
 	}
 }
 
@@ -290,7 +305,7 @@ void RTemp_display(int temp, int pokabl)
 void STemp_display(int value)
 {
 	lcd_goto_xy(0, 1);  // Move cursor to the second line (0,1)
-	lcd_puts("STemp:");  // Print "Humidity:"
+	lcd_puts("STemp:");  // Print 
 	lcd_goto_xy(6, 1);  // Move cursor to print the value
 	lcd_put_number(value);  // Display value for mode 0
 }
@@ -386,43 +401,29 @@ ISR(TIMER2_COMPA_vect)
 }
 
 int main(void) {
-	// Set LED pin as output
-	DDRB |= (1 << Relay_PIN);
-	DDRB |= (1 << Relay_PIN2);
-	
-	// Set button pins as inputs with pull-up resistors
-	
-	DDRB &= ~(1 << BUTTON_DEC);  // Set PD7 as inputs
-	PORTB |= (1 << BUTTON_DEC);    // Enable pull-up resistors on PD7
-	
-	DDRD &= ~(1 << BUTTON_INC);  // Set PB6 as input
-	PORTD |= (1 << BUTTON_INC);   // Enable pull-up resistor
-	
-	 // Set mode button as input with pull-up resistor
-	 DDRC &= ~(1 << BUTTON_MODE);
-	 PORTC |= (1 << BUTTON_MODE);  // Enable pull-up resistor on PC0
-	
+	//pin init
+	pin_init();
 	//photoresistor
 	ADC_init();
-	 // Read photoresistor value from ADC0 (PC0)
-	 light_value = ADC_read(0);
-	 OCR0A = light_value / 4;
-	 // Read temperature sensor value from ADC3 (PC3)
-	  temp_sensor_value = ADC_read(3);
-	  temp = ((float)temp_sensor_value / 1024.0) * 5.0 *100.0;
-	  inttemp=(int)temp;
-	  pokabl = (int)((temp - (int)temp )* 100.0);
-	
+	init_timer0();
 	// Initialize Timer1
 	timer1_init();
 	//lcd brightness
-	init_timer0();
 	//led blink
 	init_timer2();
 	// Initialize LCD
 	lcd_init();
 	lcd_clear(); // Clear the screen at the start
 	
+		 // Read photoresistor value from ADC0 (PC0)
+		 light_value = ADC_read(0);
+		 OCR0A = light_value / 4;
+		 // Read temperature sensor value from ADC3 (PC3)
+		 temp_sensor_value = ADC_read(3);
+		 temp = ((float)temp_sensor_value / 1024.0) * 5.0 *100.0;
+		 inttemp=(int)temp;
+		 pokabl = (int)((temp - (int)temp )* 100.0);
+
 
 	while (1) {
 		
@@ -436,13 +437,11 @@ int main(void) {
 			if (cnt < 3)
 			{
 					lcd_goto_xy(0, 1);  // Move cursor to the second line (0,1)
-					lcd_puts("      ");  // Print "Humidity:"
+					lcd_puts("      ");  // Print 
 					lcd_goto_xy(6, 1);  // Move cursor to print the value
 					lcd_puts("  ");  // Display value for mode 0
-					
-					STemp_display(value);
 					_delay_ms(200);
-
+					STemp_display(value);
 
 					cnt++;	
 			  }
@@ -460,7 +459,7 @@ int main(void) {
 			{
 			
 					lcd_goto_xy(9, 1);  // Move cursor to the second line (0,1)
-					lcd_puts("    ");  // Print "Humidity:"
+					lcd_puts("    ");  // Print 
 					lcd_goto_xy(13, 1);  // Move cursor to print the value
 					lcd_puts("   ");  // Display value for mode 0
 					
@@ -483,34 +482,32 @@ int main(void) {
 						PORTB &= ~(1 << Relay_PIN);
 						PORTB &= ~(1 << Relay_PIN2);
 					}
-
-					// Control LED1 and LED2 based on the comparison between setpoint and temperature
-					if (value > temp + 0.5)
-					{
-						if (timer != 0)
-						{
-						PORTB |= (1 << Relay_PIN);  // Turn on LED1 if setpoint > temp + 0.5
-						}
-						PORTB &= ~(1 << Relay_PIN2); // Turn off LED2
-						
-					}
-										
-					else if (value < temp - 0.5)
-					{	
-						if (timer != 0)
-						{
-						PORTB |= (1 << Relay_PIN2); // Turn on LED2 if setpoint < temp - 0.5
-						}
-						PORTB &= ~(1 << Relay_PIN);  // Turn off LED1
-					}
-										
+					
 					else
 					{
-						// Turn off both LEDs if setpoint is within 0.5 degrees of room temperature
-						
-						PORTB &= ~(1 << Relay_PIN);
-						PORTB &= ~(1 << Relay_PIN2);
+											// Control LED1 and LED2 based on the comparison between setpoint and temperature
+											if (value > temp + 0.5)
+											{
+												PORTB |= (1 << Relay_PIN);  // Turn on LED1 if setpoint > temp + 0.5
+												PORTB &= ~(1 << Relay_PIN2); // Turn off LED2
+											}
+											
+											else if (value < temp - 0.5)
+											{
+												PORTB |= (1 << Relay_PIN2); // Turn on LED2 if setpoint < temp - 0.5
+												PORTB &= ~(1 << Relay_PIN);  // Turn off LED1
+											}
+											
+											else
+											{
+												// Turn off both LEDs if setpoint is within 0.5 degrees of room temperature
+												
+												PORTB &= ~(1 << Relay_PIN);
+												PORTB &= ~(1 << Relay_PIN2);
+											}
 					}
+
+
 			
 
 					
