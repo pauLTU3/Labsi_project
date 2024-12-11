@@ -41,6 +41,7 @@ int value = 20;  // Variable to store the incremented/decremented value
 int ledtimer=0;
 double timer =0;
 int cnt=3;
+int cnt1=0;
 int cnt2 = 0;
 int cnttimer1=0;
 
@@ -261,8 +262,12 @@ void timer_display(double timer)
 
 	if (timer > 0)
 	{
-		lcd_puts("     ");
-			
+		if (cnt1 ==0)
+		{
+			lcd_puts("     ");
+			cnt1 +=1;
+		}
+		
 		if (total_hours >= 10)
 		{
 			lcd_put_number(total_hours);  // Display integer part
@@ -285,6 +290,7 @@ void timer_display(double timer)
 	else
 	{
 		lcd_puts("OFF  ");
+		cnt1 =0;
 	}
 }
 
@@ -462,9 +468,9 @@ int main(void) {
 					lcd_puts("    ");  // Print 
 					lcd_goto_xy(13, 1);  // Move cursor to print the value
 					lcd_puts("   ");  // Display value for mode 0
-					
-					timer_display(timer);
 					_delay_ms(200);
+					timer_display(timer);
+					
 					
 
 					cnt++;
@@ -477,35 +483,35 @@ int main(void) {
 		}
 		
 		
-					if (timer == 0)
-					{
-						PORTB &= ~(1 << Relay_PIN);
-						PORTB &= ~(1 << Relay_PIN2);
-					}
-					
-					else
-					{
-											// Control LED1 and LED2 based on the comparison between setpoint and temperature
-											if (value > temp + 0.5)
-											{
-												PORTB |= (1 << Relay_PIN);  // Turn on LED1 if setpoint > temp + 0.5
-												PORTB &= ~(1 << Relay_PIN2); // Turn off LED2
-											}
-											
-											else if (value < temp - 0.5)
-											{
-												PORTB |= (1 << Relay_PIN2); // Turn on LED2 if setpoint < temp - 0.5
-												PORTB &= ~(1 << Relay_PIN);  // Turn off LED1
-											}
-											
-											else
-											{
-												// Turn off both LEDs if setpoint is within 0.5 degrees of room temperature
-												
-												PORTB &= ~(1 << Relay_PIN);
-												PORTB &= ~(1 << Relay_PIN2);
-											}
-					}
+		if (timer == 0)
+		{
+			PORTB &= ~(1 << Relay_PIN);
+			PORTB &= ~(1 << Relay_PIN2);
+		}
+		
+		else
+		{
+			// Control LED1 and LED2 based on the comparison between setpoint and temperature
+			if (value > temp + 0.5)
+			{
+				PORTB |= (1 << Relay_PIN);  // Turn on LED1 if setpoint > temp + 0.5
+				PORTB &= ~(1 << Relay_PIN2); // Turn off LED2
+			}
+			
+			else if (value < temp - 0.5)
+			{
+				PORTB |= (1 << Relay_PIN2); // Turn on LED2 if setpoint < temp - 0.5
+				PORTB &= ~(1 << Relay_PIN);  // Turn off LED1
+			}
+			
+			else
+			{
+				// Turn off both LEDs if setpoint is within 0.5 degrees of room temperature
+				
+				PORTB &= ~(1 << Relay_PIN);
+				PORTB &= ~(1 << Relay_PIN2);
+			}
+		}
 
 
 			
